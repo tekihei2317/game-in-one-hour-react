@@ -30,6 +30,125 @@ function waitForEnter() {
   });
 }
 
+async function handleAttack({
+  setMessages,
+  character,
+  target,
+}: Pick<UseBattleInput, "setMessages"> & {
+  character: CharacterStatus;
+  target: CharacterStatus;
+}): Promise<CharacterStatus> {
+  setMessages([`${character.name}の　こうげき！`]);
+  await waitForEnter();
+
+  const damage = calculateDamage(character.attack);
+  const newTarget: CharacterStatus = {
+    ...target,
+    hp: Math.max(target.hp - damage, 0),
+  };
+  setMessages([`${target.name}に${damage}の　ダメージ！`]);
+
+  return newTarget;
+}
+
+/**
+ * プレイヤーのターンの処理
+ */
+async function handlePlayerTurn({
+  characters,
+  setMessages,
+  setCharacters,
+  setBattleStatus,
+}: UseBattleInput): Promise<{ continue: boolean }> {
+  const [player, monster] = characters;
+
+  if (player.command === "FIGHT") {
+    // 攻撃する
+    const target = await handleAttack({
+      setMessages,
+      character: player,
+      target: monster,
+    });
+    setCharacters([player, target]);
+    await waitForEnter();
+
+    // 倒れた場合の処理
+    if (target.hp === 0) {
+      setMessages([`${target.name}を　たおした！`]);
+
+      // モンスターのアスキーアートを消す
+      setCharacters(([player, monster]) => [player, { ...monster, aa: "\n" }]);
+
+      await waitForEnter();
+      return { continue: false };
+    }
+  } else if (player.command === "SPELL") {
+    // 呪文（回復する）
+    if (characters[CHARACTER_PLAYER].mp < SPELL_COST) {
+      setMessages([`MPが　たりない！`]);
+      await waitForEnter();
+
+      setBattleStatus("command");
+      setMessages([]);
+      return { continue: true };
+    }
+
+    setMessages([`${player.name}は　ヒールを　となえた！`]);
+    await waitForEnter();
+
+    const newPlayer = {
+      ...player,
+      hp: player.maxHp,
+      mp: player.mp - SPELL_COST,
+    };
+    setCharacters([newPlayer, monster]);
+    setMessages([`${player.name}のきずが　かいふくした！`]);
+    await waitForEnter();
+  } else {
+    // 逃げる
+    setMessages([`${player.name}は　にげだした！`]);
+    await waitForEnter();
+    setMessages([]);
+    return { continue: false };
+  }
+
+  return { continue: true };
+}
+
+/** モンスターのターンの処理 */
+async function handleMonsterTurn({
+  characters,
+  setMessages,
+  setCharacters,
+}: Pick<
+  UseBattleInput,
+  "characters" | "setMessages" | "setCharacters"
+>): Promise<{ continue: boolean }> {
+  const [player, monster] = characters;
+
+  if (monster.command !== "FIGHT") {
+    console.log("モンスターはこうげき以外できません");
+    return { continue: false };
+  }
+
+  // 攻撃する
+  const newPlayer = await handleAttack({
+    setMessages,
+    character: monster,
+    target: player,
+  });
+  setCharacters([newPlayer, monster]);
+  await waitForEnter();
+
+  // プレイヤー倒れた場合の処理
+  if (newPlayer.hp === 0) {
+    setMessages(["あなたは　しにました"]);
+    return { continue: false };
+  }
+
+  return { continue: true };
+}
+
 export function useBattle({
   characters,
   setMessages,
@@ -37,80 +156,20 @@ export function useBattle({
   setBattleStatus,
 }: UseBattleInput): UseBattleReturn {
   const handleCommand = useCallback(async () => {
-    let newCharacters: CharacterStatus[] = characters;
+    const playerTurnResult = await handlePlayerTurn({
+      characters,
+      setMessages,
+      setCharacters,
+      setBattleStatus,
+    });
+    if (!playerTurnResult.continue) return;
 
-    for (const character of characters) {
-      if (character.command === "FIGHT") {
-        // 攻撃する
-        setMessages([`${character.name}の　こうげき！`]);
-        await waitForEnter();
-
-        const damage = calculateDamage(character.attack);
-        const target: CharacterStatus = {
-          ...newCharacters[character.target],
-          hp: Math.max(newCharacters[character.target].hp - damage, 0),
-        };
-        newCharacters = newCharacters.map((char, index) =>
-          index === character.target ? target : char
-        );
-        setCharacters(newCharacters);
-
-        setMessages([`${target.name}に${damage}の　ダメージ！`]);
-        await waitForEnter();
-
-        // 倒れた場合の処理
-        if (target.hp === 0) {
-          if (character.target === CHARACTER_PLAYER) {
-            // プレイヤーが倒された場合
-            setMessages(["あなたは　しにました"]);
-            return;
-          } else {
-            // モンスターを倒した場合
-            setMessages([`${target.name}を　たおした！`]);
-
-            // モンスターのアスキーアートを消す
-            setCharacters(([player, monster]) => [
-              player,
-              { ...monster, aa: "\n" },
-            ]);
-
-            await waitForEnter();
-            return;
-          }
-        }
-      } else if (character.command === "SPELL") {
-        // 呪文（回復する）
-        if (characters[CHARACTER_PLAYER].mp < SPELL_COST) {
-          setMessages([`MPが　たりない！`]);
-          await waitForEnter();
-
-          setBattleStatus("command");
-          setMessages([]);
-          return;
-        }
-
-        setMessages([`${character.name}は　ヒールを　となえた！`]);
-        await waitForEnter();
-
-        newCharacters = [
-          {
-            ...newCharacters[0],
-            hp: newCharacters[0].maxHp,
-            mp: newCharacters[0].mp - SPELL_COST,
-          },
-          newCharacters[1],
-        ];
-        setCharacters(newCharacters);
-        setMessages([`${character.name}のきずが　かいふくした！`]);
-        await waitForEnter();
-      } else {
-        // 逃げる
-        setMessages([`${character.name}は　にげだした！`]);
-        await waitForEnter();
-        setMessages([]);
-        return;
-      }
-    }
+    const monsterTurnResult = await handleMonsterTurn({
+      characters,
+      setMessages,
+      setCharacters,
+    });
+    if (!monsterTurnResult.continue) return;
 
     // 戦闘が継続する場合、コマンド選択に戻る
     setBattleStatus("command");
