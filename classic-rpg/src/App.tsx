@@ -10,7 +10,6 @@ import {
   CHARACTER_MONSTER,
   BattleStatus,
 } from "./rpg";
-import "./App.css";
 import { useKeyboardEvent } from "./use-keyboard-event";
 import { useBattle } from "./use-battle";
 
@@ -75,8 +74,8 @@ function App() {
 
   return (
     <>
-      <div className="container-outer">
-        <div className="container">
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div style={{ width: "800px" }}>
           {/* プレイヤーを表示する */}
           <div>{characters[CHARACTER_PLAYER].name}</div>
           <div>
