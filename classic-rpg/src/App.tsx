@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 
 /** プレイヤーが選択するコマンド（戦う、呪文、逃げる） */
 type Command = "FIGHT" | "SPELL" | "RUN";
+const commands: Command[] = ["FIGHT", "SPELL", "RUN"];
 
 /**
  * キャラクターのステータス
@@ -17,6 +18,10 @@ export type CharacterStatus = {
   aa: string;
   /** 選択中のコマンド */
   command: Command;
+  /** 攻撃対象（配列のインデックス） */
+  target: number;
+  /** 攻撃力 */
+  attack: number;
 };
 
 export const MONSTER_PLAYER = 0;
@@ -39,6 +44,8 @@ const monsters: CharacterStatus[] = [
     name: "ゆうしゃ",
     aa: "",
     command: "FIGHT",
+    target: CHARACTER_MONSTER,
+    attack: 3,
   },
   {
     hp: 3,
@@ -49,8 +56,14 @@ const monsters: CharacterStatus[] = [
     aa: `／・Д・＼
 ～～～～～`,
     command: "FIGHT",
+    target: CHARACTER_PLAYER,
+    attack: 2,
   },
 ];
+
+function calculateDamage(attack: number): number {
+  return 1 + Math.floor(Math.random() * attack);
+}
 
 function waitForEnter() {
   return new Promise<void>((resolve) => {
@@ -64,8 +77,8 @@ function waitForEnter() {
   });
 }
 
-/** 戦闘中の状態（戦闘開始、コマンド選択、戦闘終了） */
-type BattleStatus = "start" | "command" | "end";
+/** 戦闘中の状態（戦闘開始、コマンド選択中、コマンド選択後、戦闘終了） */
+type BattleStatus = "start" | "command" | "command_selected" | "end";
 
 type CommandUIProps = {
   selectedCommand: Command;
@@ -84,25 +97,11 @@ function CommandUI({ selectedCommand }: CommandUIProps) {
 
 function App() {
   const [battleStatus, setBattleStatus] = useState<BattleStatus>("start");
-
-  // キーボード入力の処理をする
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // プレイヤーがEnterを押したら、"start"→"command"にする
-      if (battleStatus === "start") {
-        if (e.key === "Enter") {
-          setBattleStatus("command");
-        }
-      }
-    };
-    window.addEventListener("keydown", handler);
-
-    return () => window.removeEventListener("keydown", handler);
-  }, [battleStatus]);
+  const [commandIndex, setCommandIndex] = useState<number>(0);
 
   // プレイヤーのステータスを初期化する
   // ↑これstateで持つのかrefで持つのかどっちがいいんだろうね...
-  const [characters] = useState<CharacterStatus[]>([
+  const [characters, setCharacters] = useState<CharacterStatus[]>([
     monsters[MONSTER_PLAYER],
     monsters[MONSTER_SLIME],
   ]);
@@ -112,12 +111,27 @@ function App() {
   ]);
 
   /** コマンドを実行する */
-  const handleCommand = async () => {
+  const handleCommand = useCallback(async () => {
     for (const character of characters) {
       if (character.command === "FIGHT") {
         console.log("戦う");
 
         setMessages([`${character.name}の　こうげき！`]);
+        await waitForEnter();
+
+        // 攻撃対象にダメージを与える
+        const damage = calculateDamage(character.attack);
+        setCharacters((prev) =>
+          prev.map((char, index) => {
+            if (index === character.target) {
+              return { ...char, hp: Math.max(char.hp - damage, 0) };
+            }
+            return char;
+          })
+        );
+        setMessages([
+          `${characters[character.target].name}に${damage}の　ダメージ！`,
+        ]);
         await waitForEnter();
       } else if (character.command === "SPELL") {
         console.log("呪文");
@@ -125,17 +139,39 @@ function App() {
         console.log("逃げる");
       }
     }
-  };
+  }, [characters]);
 
-  // const messages = (() => {
-  //   if (battleStatus === "start") {
-  //     return <div>{characters[CHARACTER_MONSTER].name}があらわれた！</div>;
-  //   } else if (battleStatus === "command") {
-  //     return <div>コマンド</div>;
-  //   } else {
-  //     <div>戦闘終了</div>;
-  //   }
-  // })();
+  // キーボード入力の処理をする
+  useEffect(() => {
+    const handler = async (e: KeyboardEvent) => {
+      if (battleStatus === "start") {
+        // プレイヤーがEnterを押したら、"start"→"command"にする
+        if (e.key === "Enter") {
+          setBattleStatus("command");
+        }
+      } else if (battleStatus === "command") {
+        // カーソルキーでコマンドの選択を切り替える
+        if (e.key === "ArrowDown") {
+          setCommandIndex((prev) => (prev + 1) % commands.length);
+        } else if (e.key === "ArrowUp") {
+          setCommandIndex(
+            (prev) => (prev - 1 + commands.length) % commands.length
+          );
+        }
+
+        // エンターキーを押すと、現在選択しているコマンドを実行する
+        if (e.key === "Enter") {
+          // ここで処理を止められるかどうか確認する
+          console.log("command selected");
+          setBattleStatus("command_selected");
+          handleCommand();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+
+    return () => window.removeEventListener("keydown", handler);
+  }, [battleStatus, handleCommand]);
 
   return (
     <>
@@ -166,12 +202,16 @@ function App() {
             ))}
           </div>
 
-          <div>
-            <CommandUI
-              selectedCommand="FIGHT"
-              onEnter={() => console.log("コマンドが選ばれました")}
-            />
-          </div>
+          {battleStatus === "command" && (
+            <div>
+              <CommandUI
+                selectedCommand={commands[commandIndex]}
+                onEnter={() =>
+                  console.log(commands[commandIndex], "が選ばれました")
+                }
+              />
+            </div>
+          )}
         </div>
       </div>
     </>
