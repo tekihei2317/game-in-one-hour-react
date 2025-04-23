@@ -46,7 +46,7 @@ export const monsters: CharacterStatus[] = [
     aa: "",
     command: "FIGHT",
     target: CHARACTER_MONSTER,
-    attack: 100,
+    attack: 200,
   },
   {
     hp: 3,
@@ -77,3 +77,6 @@ export const monsters: CharacterStatus[] = [
 export function calculateDamage(attack: number): number {
   return 1 + Math.floor(Math.random() * attack);
 }
+
+/** 戦闘中の状態（戦闘開始、コマンド選択中、コマンド選択後、戦闘終了） */
+export type BattleStatus = "start" | "command" | "command_selected" | "end";

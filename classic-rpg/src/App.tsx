@@ -1,33 +1,18 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import {
   Command,
   CharacterStatus,
   monsters,
   commands,
-  calculateDamage,
   MONSTER_PLAYER,
   MONSTER_BOSS,
   CHARACTER_PLAYER,
   CHARACTER_MONSTER,
-  SPELL_COST,
+  BattleStatus,
 } from "./rpg";
 import "./App.css";
 import { useKeyboardEvent } from "./use-keyboard-event";
-
-function waitForEnter() {
-  return new Promise<void>((resolve) => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
-        window.removeEventListener("keydown", handler);
-        resolve(); // ユーザーがEnterを押したら解決
-      }
-    };
-    window.addEventListener("keydown", handler);
-  });
-}
-
-/** 戦闘中の状態（戦闘開始、コマンド選択中、コマンド選択後、戦闘終了） */
-type BattleStatus = "start" | "command" | "command_selected" | "end";
+import { useBattle } from "./use-battle";
 
 type CommandUIProps = {
   selectedCommand: Command;
@@ -47,7 +32,6 @@ function App() {
   const [battleStatus, setBattleStatus] = useState<BattleStatus>("start");
   const [commandIndex, setCommandIndex] = useState<number>(0);
 
-  // プレイヤーのステータスを初期化する
   const [characters, setCharacters] = useState<CharacterStatus[]>([
     monsters[MONSTER_PLAYER],
     // monsters[MONSTER_SLIME],
@@ -58,89 +42,12 @@ function App() {
     `${characters[CHARACTER_MONSTER].name}が　あらわれた！`,
   ]);
 
-  /** コマンドを実行する */
-  const handleCommand = useCallback(async () => {
-    let newCharacters: CharacterStatus[] = characters;
-
-    for (const character of characters) {
-      if (character.command === "FIGHT") {
-        // 攻撃する
-        setMessages([`${character.name}の　こうげき！`]);
-        await waitForEnter();
-
-        const damage = calculateDamage(character.attack);
-        const target: CharacterStatus = {
-          ...newCharacters[character.target],
-          // ここcharactersで最新の値を取れないのでバグっていました
-          // TODO: ステートで最新の値取れないのなんとかしてくれ
-          hp: Math.max(newCharacters[character.target].hp - damage, 0),
-        };
-        newCharacters = newCharacters.map((char, index) =>
-          index === character.target ? target : char
-        );
-        setCharacters(newCharacters);
-
-        setMessages([`${target.name}に${damage}の　ダメージ！`]);
-        await waitForEnter();
-
-        // 倒れた場合の処理
-        if (target.hp === 0) {
-          if (character.target === CHARACTER_PLAYER) {
-            // プレイヤーが倒された場合
-            console.log("プレイヤーが倒された");
-            setMessages(["あなたは　しにました"]);
-            return;
-          } else {
-            // モンスターを倒した場合
-            setMessages([`${target.name}を　たおした！`]);
-
-            // モンスターのアスキーアートを消す
-            setCharacters(([player, monster]) => [
-              player,
-              { ...monster, aa: "\n" },
-            ]);
-
-            await waitForEnter();
-            return;
-          }
-        }
-      } else if (character.command === "SPELL") {
-        // 呪文（回復する）
-        if (characters[CHARACTER_PLAYER].mp < SPELL_COST) {
-          setMessages([`MPが　たりない！`]);
-          await waitForEnter();
-
-          setBattleStatus("command");
-          setMessages([]);
-          return;
-        }
-
-        setMessages([`${character.name}は　ヒールを　となえた！`]);
-        await waitForEnter();
-
-        newCharacters = [
-          {
-            ...newCharacters[0],
-            hp: newCharacters[0].maxHp,
-            mp: newCharacters[0].mp - SPELL_COST,
-          },
-          newCharacters[1],
-        ];
-        setCharacters(newCharacters);
-        setMessages([`${character.name}のきずが　かいふくした！`]);
-        await waitForEnter();
-      } else {
-        // 逃げる
-        setMessages([`${character.name}は　にげだした！`]);
-        await waitForEnter();
-        setMessages([]);
-        return;
-      }
-    }
-
-    // 戦闘が継続する場合、コマンド選択に戻る
-    setBattleStatus("command");
-  }, [characters]);
+  const { handleCommand } = useBattle({
+    characters,
+    setCharacters,
+    setMessages,
+    setBattleStatus,
+  });
 
   // キーボード入力の処理をする
   useKeyboardEvent({
