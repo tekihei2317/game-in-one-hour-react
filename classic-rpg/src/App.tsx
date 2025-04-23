@@ -5,6 +5,9 @@ import "./App.css";
 type Command = "FIGHT" | "SPELL" | "RUN";
 const commands: Command[] = ["FIGHT", "SPELL", "RUN"];
 
+/** 呪文の消費MP */
+const SPELL_COST = 3;
+
 /**
  * キャラクターのステータス
  */
@@ -26,7 +29,8 @@ export type CharacterStatus = {
 
 export const MONSTER_PLAYER = 0;
 export const MONSTER_SLIME = 1;
-export const MONSTER_MAX = 2;
+export const MONSTER_BOSS = 2;
+export const MONSTER_MAX = 3;
 
 export const CHARACTER_PLAYER = 0;
 export const CHARACTER_MONSTER = 1;
@@ -37,15 +41,15 @@ export const CHARACTER_MAX = 2;
  */
 const monsters: CharacterStatus[] = [
   {
-    hp: 15,
-    maxHp: 15,
-    mp: 15,
+    hp: 100,
+    maxHp: 100,
+    mp: 100,
     maxMp: 15,
     name: "ゆうしゃ",
     aa: "",
     command: "FIGHT",
     target: CHARACTER_MONSTER,
-    attack: 3,
+    attack: 100,
   },
   {
     hp: 3,
@@ -59,11 +63,22 @@ const monsters: CharacterStatus[] = [
     target: CHARACTER_PLAYER,
     attack: 2,
   },
+  {
+    hp: 255,
+    maxHp: 255,
+    mp: 0,
+    maxMp: 3,
+    name: "まおう",
+    aa: `　　Ａ＠Ａ
+ψ（▼皿▼）ψ`,
+    command: "FIGHT",
+    target: CHARACTER_PLAYER,
+    attack: 50,
+  },
 ];
 
 function calculateDamage(attack: number): number {
-  return 2;
-  // return 1 + Math.floor(Math.random() * attack);
+  return 1 + Math.floor(Math.random() * attack);
 }
 
 function waitForEnter() {
@@ -104,7 +119,8 @@ function App() {
   // ↑これstateで持つのかrefで持つのかどっちがいいんだろうね...
   const [characters, setCharacters] = useState<CharacterStatus[]>([
     monsters[MONSTER_PLAYER],
-    monsters[MONSTER_SLIME],
+    // monsters[MONSTER_SLIME],
+    monsters[MONSTER_BOSS],
   ]);
 
   const [messages, setMessages] = useState<string[]>([
@@ -113,6 +129,8 @@ function App() {
 
   /** コマンドを実行する */
   const handleCommand = useCallback(async () => {
+    let newCharacters: CharacterStatus[] = characters;
+
     for (const character of characters) {
       if (character.command === "FIGHT") {
         // 攻撃する
@@ -121,14 +139,15 @@ function App() {
 
         const damage = calculateDamage(character.attack);
         const target: CharacterStatus = {
-          ...characters[character.target],
-          hp: Math.max(characters[character.target].hp - damage, 0),
+          ...newCharacters[character.target],
+          // ここcharactersで最新の値を取れないのでバグっていました
+          // TODO: ステートで最新の値取れないのなんとかしてくれ
+          hp: Math.max(newCharacters[character.target].hp - damage, 0),
         };
-        setCharacters((prev) =>
-          prev.map((char, index) =>
-            index === character.target ? target : char
-          )
+        newCharacters = newCharacters.map((char, index) =>
+          index === character.target ? target : char
         );
+        setCharacters(newCharacters);
 
         setMessages([`${target.name}に${damage}の　ダメージ！`]);
         await waitForEnter();
@@ -138,6 +157,7 @@ function App() {
           if (character.target === CHARACTER_PLAYER) {
             // プレイヤーが倒された場合
             console.log("プレイヤーが倒された");
+            setMessages(["あなたは　しにました"]);
             return;
           } else {
             // モンスターを倒した場合
@@ -154,17 +174,34 @@ function App() {
           }
         }
       } else if (character.command === "SPELL") {
-        // 呪文
-        setMessages([`じゅもんはまだ使えない！`]);
+        // 呪文（回復する）
+        if (characters[CHARACTER_PLAYER].mp < SPELL_COST) {
+          setMessages([`MPが　たりない！`]);
+          await waitForEnter();
+
+          setBattleStatus("command");
+          setMessages([]);
+          return;
+        }
+
+        setMessages([`${character.name}は　ヒールを　となえた！`]);
         await waitForEnter();
-        setBattleStatus("command");
-        setMessages([]);
-        return;
+
+        newCharacters = [
+          {
+            ...newCharacters[0],
+            hp: newCharacters[0].maxHp,
+            mp: newCharacters[0].mp - SPELL_COST,
+          },
+          newCharacters[1],
+        ];
+        setCharacters(newCharacters);
+        setMessages([`${character.name}のきずが　かいふくした！`]);
+        await waitForEnter();
       } else {
         // 逃げる
-        setMessages([`にげるはまだ使えない！`]);
+        setMessages([`${character.name}は　にげだした！`]);
         await waitForEnter();
-        setBattleStatus("command");
         setMessages([]);
         return;
       }
