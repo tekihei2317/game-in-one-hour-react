@@ -24,8 +24,8 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       // 文字列中の全角スペースでエラーが出ないようにする
-      // 上書きしている設定がどこで定義されているのかは把握していない
-      "no-irregular-whitespaces": ["error"],
+      // 上書きしている設定がどこで定義されているのかは確認していない
+      "no-irregular-whitespace": ["error", { skipTemplates: true }],
     },
   }
 );

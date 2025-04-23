@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Command,
   CharacterStatus,
@@ -12,6 +12,7 @@ import {
   SPELL_COST,
 } from "./rpg";
 import "./App.css";
+import { useKeyboardEvent } from "./use-keyboard-event";
 
 function waitForEnter() {
   return new Promise<void>((resolve) => {
@@ -142,46 +143,28 @@ function App() {
   }, [characters]);
 
   // キーボード入力の処理をする
-  useEffect(() => {
-    const handler = async (e: KeyboardEvent) => {
-      if (battleStatus === "start") {
-        // プレイヤーがEnterを押したら、"start"→"command"にする
-        if (e.key === "Enter") {
-          setBattleStatus("command");
-        }
-      } else if (battleStatus === "command") {
-        // カーソルキーでコマンドの選択を切り替える
-        let newCommandIndex = commandIndex;
-        if (e.key === "ArrowDown") {
-          newCommandIndex = (commandIndex + 1) % commands.length;
-          setCharacters(([player, monster]) => [
-            { ...player, command: commands[newCommandIndex] },
-            monster,
-          ]);
-          setCommandIndex(newCommandIndex);
-        } else if (e.key === "ArrowUp") {
-          newCommandIndex =
-            (commandIndex - 1 + commands.length) % commands.length;
-          setCharacters(([player, monster]) => [
-            { ...player, command: commands[newCommandIndex] },
-            monster,
-          ]);
-          setCommandIndex(newCommandIndex);
-        }
-
-        // エンターキーを押すと、現在選択しているコマンドを実行する
-        if (e.key === "Enter") {
-          setBattleStatus("command_selected");
-          handleCommand();
-        }
+  useKeyboardEvent({
+    battleStatus,
+    handleCommand: () => {
+      setBattleStatus("command_selected");
+      handleCommand();
+    },
+    startCommandSelection: () => setBattleStatus("command"),
+    updateCommandIndex: (direction: "up" | "down") => {
+      let newCommandIndex = commandIndex;
+      if (direction === "up") {
+        newCommandIndex =
+          (commandIndex - 1 + commands.length) % commands.length;
+      } else {
+        newCommandIndex = (commandIndex + 1) % commands.length;
       }
-    };
-    window.addEventListener("keydown", handler);
-
-    return () => window.removeEventListener("keydown", handler);
-
-    // TODO: commandIndex, handleCommandは除外する
-  }, [battleStatus, handleCommand, commandIndex]);
+      setCharacters(([player, monster]) => [
+        { ...player, command: commands[newCommandIndex] },
+        monster,
+      ]);
+      setCommandIndex(newCommandIndex);
+    },
+  });
 
   return (
     <>
