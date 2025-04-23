@@ -141,15 +141,32 @@ function App() {
             return;
           } else {
             // モンスターを倒した場合
-            setMessages([`${target.name}　を　たおした！`]);
-            waitForEnter();
+            setMessages([`${target.name}を　たおした！`]);
+
+            // モンスターのアスキーアートを消す
+            setCharacters(([player, monster]) => [
+              player,
+              { ...monster, aa: "\n" },
+            ]);
+
+            await waitForEnter();
             return;
           }
         }
       } else if (character.command === "SPELL") {
         // 呪文
+        setMessages([`じゅもんはまだ使えない！`]);
+        await waitForEnter();
+        setBattleStatus("command");
+        setMessages([]);
+        return;
       } else {
         // 逃げる
+        setMessages([`にげるはまだ使えない！`]);
+        await waitForEnter();
+        setBattleStatus("command");
+        setMessages([]);
+        return;
       }
     }
 
@@ -167,12 +184,22 @@ function App() {
         }
       } else if (battleStatus === "command") {
         // カーソルキーでコマンドの選択を切り替える
+        let newCommandIndex = commandIndex;
         if (e.key === "ArrowDown") {
-          setCommandIndex((prev) => (prev + 1) % commands.length);
+          newCommandIndex = (commandIndex + 1) % commands.length;
+          setCharacters(([player, monster]) => [
+            { ...player, command: commands[newCommandIndex] },
+            monster,
+          ]);
+          setCommandIndex(newCommandIndex);
         } else if (e.key === "ArrowUp") {
-          setCommandIndex(
-            (prev) => (prev - 1 + commands.length) % commands.length
-          );
+          newCommandIndex =
+            (commandIndex - 1 + commands.length) % commands.length;
+          setCharacters(([player, monster]) => [
+            { ...player, command: commands[newCommandIndex] },
+            monster,
+          ]);
+          setCommandIndex(newCommandIndex);
         }
 
         // エンターキーを押すと、現在選択しているコマンドを実行する
@@ -185,7 +212,9 @@ function App() {
     window.addEventListener("keydown", handler);
 
     return () => window.removeEventListener("keydown", handler);
-  }, [battleStatus, handleCommand]);
+
+    // TODO: commandIndex, handleCommandは除外する
+  }, [battleStatus, handleCommand, commandIndex]);
 
   return (
     <>
