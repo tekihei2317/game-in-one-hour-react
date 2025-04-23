@@ -1,85 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
+import {
+  Command,
+  CharacterStatus,
+  monsters,
+  commands,
+  calculateDamage,
+  MONSTER_PLAYER,
+  MONSTER_BOSS,
+  CHARACTER_PLAYER,
+  CHARACTER_MONSTER,
+  SPELL_COST,
+} from "./rpg";
 import "./App.css";
-
-/** プレイヤーが選択するコマンド（戦う、呪文、逃げる） */
-type Command = "FIGHT" | "SPELL" | "RUN";
-const commands: Command[] = ["FIGHT", "SPELL", "RUN"];
-
-/** 呪文の消費MP */
-const SPELL_COST = 3;
-
-/**
- * キャラクターのステータス
- */
-export type CharacterStatus = {
-  hp: number;
-  maxHp: number;
-  mp: number;
-  maxMp: number;
-  name: string;
-  /** アスキーアート */
-  aa: string;
-  /** 選択中のコマンド */
-  command: Command;
-  /** 攻撃対象（配列のインデックス） */
-  target: number;
-  /** 攻撃力 */
-  attack: number;
-};
-
-export const MONSTER_PLAYER = 0;
-export const MONSTER_SLIME = 1;
-export const MONSTER_BOSS = 2;
-export const MONSTER_MAX = 3;
-
-export const CHARACTER_PLAYER = 0;
-export const CHARACTER_MONSTER = 1;
-export const CHARACTER_MAX = 2;
-
-/**
- * モンスターのステータスの配列
- */
-const monsters: CharacterStatus[] = [
-  {
-    hp: 100,
-    maxHp: 100,
-    mp: 100,
-    maxMp: 15,
-    name: "ゆうしゃ",
-    aa: "",
-    command: "FIGHT",
-    target: CHARACTER_MONSTER,
-    attack: 100,
-  },
-  {
-    hp: 3,
-    maxHp: 3,
-    mp: 0,
-    maxMp: 3,
-    name: "スライム",
-    aa: `／・Д・＼
-～～～～～`,
-    command: "FIGHT",
-    target: CHARACTER_PLAYER,
-    attack: 2,
-  },
-  {
-    hp: 255,
-    maxHp: 255,
-    mp: 0,
-    maxMp: 3,
-    name: "まおう",
-    aa: `　　Ａ＠Ａ
-ψ（▼皿▼）ψ`,
-    command: "FIGHT",
-    target: CHARACTER_PLAYER,
-    attack: 50,
-  },
-];
-
-function calculateDamage(attack: number): number {
-  return 1 + Math.floor(Math.random() * attack);
-}
 
 function waitForEnter() {
   return new Promise<void>((resolve) => {
@@ -98,7 +30,6 @@ type BattleStatus = "start" | "command" | "command_selected" | "end";
 
 type CommandUIProps = {
   selectedCommand: Command;
-  onEnter: () => void;
 };
 
 function CommandUI({ selectedCommand }: CommandUIProps) {
@@ -116,7 +47,6 @@ function App() {
   const [commandIndex, setCommandIndex] = useState<number>(0);
 
   // プレイヤーのステータスを初期化する
-  // ↑これstateで持つのかrefで持つのかどっちがいいんだろうね...
   const [characters, setCharacters] = useState<CharacterStatus[]>([
     monsters[MONSTER_PLAYER],
     // monsters[MONSTER_SLIME],
@@ -284,12 +214,7 @@ function App() {
 
           {battleStatus === "command" && (
             <div>
-              <CommandUI
-                selectedCommand={commands[commandIndex]}
-                onEnter={() =>
-                  console.log(commands[commandIndex], "が選ばれました")
-                }
-              />
+              <CommandUI selectedCommand={commands[commandIndex]} />
             </div>
           )}
         </div>
