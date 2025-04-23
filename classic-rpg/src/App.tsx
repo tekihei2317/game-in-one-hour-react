@@ -62,7 +62,8 @@ const monsters: CharacterStatus[] = [
 ];
 
 function calculateDamage(attack: number): number {
-  return 1 + Math.floor(Math.random() * attack);
+  return 2;
+  // return 1 + Math.floor(Math.random() * attack);
 }
 
 function waitForEnter() {
@@ -114,31 +115,46 @@ function App() {
   const handleCommand = useCallback(async () => {
     for (const character of characters) {
       if (character.command === "FIGHT") {
-        console.log("戦う");
-
+        // 攻撃する
         setMessages([`${character.name}の　こうげき！`]);
         await waitForEnter();
 
-        // 攻撃対象にダメージを与える
         const damage = calculateDamage(character.attack);
+        const target: CharacterStatus = {
+          ...characters[character.target],
+          hp: Math.max(characters[character.target].hp - damage, 0),
+        };
         setCharacters((prev) =>
-          prev.map((char, index) => {
-            if (index === character.target) {
-              return { ...char, hp: Math.max(char.hp - damage, 0) };
-            }
-            return char;
-          })
+          prev.map((char, index) =>
+            index === character.target ? target : char
+          )
         );
-        setMessages([
-          `${characters[character.target].name}に${damage}の　ダメージ！`,
-        ]);
+
+        setMessages([`${target.name}に${damage}の　ダメージ！`]);
         await waitForEnter();
+
+        // 倒れた場合の処理
+        if (target.hp === 0) {
+          if (character.target === CHARACTER_PLAYER) {
+            // プレイヤーが倒された場合
+            console.log("プレイヤーが倒された");
+            return;
+          } else {
+            // モンスターを倒した場合
+            setMessages([`${target.name}　を　たおした！`]);
+            waitForEnter();
+            return;
+          }
+        }
       } else if (character.command === "SPELL") {
-        console.log("呪文");
+        // 呪文
       } else {
-        console.log("逃げる");
+        // 逃げる
       }
     }
+
+    // 戦闘が継続する場合、コマンド選択に戻る
+    setBattleStatus("command");
   }, [characters]);
 
   // キーボード入力の処理をする
@@ -161,8 +177,6 @@ function App() {
 
         // エンターキーを押すと、現在選択しているコマンドを実行する
         if (e.key === "Enter") {
-          // ここで処理を止められるかどうか確認する
-          console.log("command selected");
           setBattleStatus("command_selected");
           handleCommand();
         }
