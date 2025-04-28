@@ -3,6 +3,11 @@ import { useEffect, useState } from "react";
 const FIELD_WIDTH = 12;
 const FIELD_HEIGHT = 12;
 
+/** 一秒あたりの更新回数 */
+const FPS = 10;
+/** 更新間隔（ ms） */
+const INTERVAL = 1000 / FPS;
+
 type Field = boolean[][];
 const EMPTY_ROW = new Array(FIELD_WIDTH).fill(false);
 
@@ -78,17 +83,13 @@ function App() {
     ...[...new Array(FIELD_HEIGHT - 3)].map(() => EMPTY_ROW),
   ]);
 
-  // Enterを押すごとにシミュレーションを進める
+  // 一定間隔ごとにフィールドを更新する
   useEffect(() => {
-    const handle = (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
-        setField(nextGeneration(field));
-      }
-    };
+    const intervalId = setInterval(() => {
+      setField(nextGeneration(field));
+    }, INTERVAL);
 
-    window.addEventListener("keydown", handle);
-
-    return () => window.removeEventListener("keydown", handle);
+    return () => clearInterval(intervalId);
   }, [field]);
 
   return (
