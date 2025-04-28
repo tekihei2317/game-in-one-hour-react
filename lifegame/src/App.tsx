@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-const FIELD_WIDTH = 12;
-const FIELD_HEIGHT = 12;
+const FIELD_WIDTH = 160;
+const FIELD_HEIGHT = 160;
 
 /** 一秒あたりの更新回数 */
 const FPS = 10;
@@ -16,7 +16,7 @@ const EMPTY_ROW = new Array(FIELD_WIDTH).fill(false);
  */
 function Field({ field }: { field: Field }) {
   return (
-    <div>
+    <div style={{ fontSize: 6 }}>
       {field.map((row, index) => (
         <div key={index}>{row.map((cell) => (cell ? "■" : "　")).join("")}</div>
       ))}
@@ -75,13 +75,57 @@ function nextGeneration(field: Field): Field {
   return newField;
 }
 
+type Pattern = boolean[][];
+
+/**
+ * フィールドに特定のパターンを書き込む
+ */
+function writePattern(
+  field: Field,
+  pattern: Pattern,
+  destY: number,
+  destX: number
+) {
+  const newField = structuredClone(field);
+  for (let i = 0; i < pattern.length; i++) {
+    for (let j = 0; j < pattern[0].length; j++) {
+      console.log(i, j);
+      newField[destY + i][destX + j] = pattern[i][j];
+    }
+  }
+  return newField;
+}
+
+const patternWidth = 10;
+const patternHeight = 8;
+const pattern: Pattern = [
+  [false, false, false, false, false, false, false, false, false, false],
+  [false, false, false, false, false, false, false, true, false, false],
+  [false, false, false, false, false, true, false, true, true, false],
+  [false, false, false, false, false, true, false, true, false, false],
+  [false, false, false, false, false, true, false, false, false, false],
+  [false, false, false, true, false, false, false, false, false, false],
+  [false, true, false, true, false, false, false, false, false, false],
+  [false, false, false, false, false, false, false, false, false, false],
+];
+
 function App() {
-  const [field, setField] = useState<Field>([
-    [false, true, false, ...new Array(FIELD_WIDTH - 3).fill(false)],
-    [false, false, true, ...new Array(FIELD_WIDTH - 3).fill(false)],
-    [true, true, true, ...new Array(FIELD_WIDTH - 3).fill(false)],
-    ...[...new Array(FIELD_HEIGHT - 3)].map(() => EMPTY_ROW),
-  ]);
+  const [field, setField] = useState<Field>(
+    [...new Array(FIELD_HEIGHT)].map(() => EMPTY_ROW.slice())
+  );
+
+  useEffect(() => {
+    // フィールド中央にパターンをコピーする
+    setField(
+      writePattern(
+        field,
+        pattern,
+        FIELD_HEIGHT / 2 - patternHeight / 2,
+        FIELD_WIDTH / 2 - patternWidth / 2
+      )
+    );
+    // TODO: 一回だけでOKなので...
+  }, []);
 
   // 一定間隔ごとにフィールドを更新する
   useEffect(() => {
