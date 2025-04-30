@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const BOARD_WIDTH = 8;
 const BOARD_HEIGHT = 8;
@@ -13,14 +13,26 @@ const CELL_NONE = 2;
 /** セルのアスキーアート */
 const cellAA = ["●", "○️", "・"];
 
-function Board({ board }: { board: Board }) {
+type Vector2 = { x: number; y: number };
+
+function Board({
+  board,
+  cursorPosition,
+}: {
+  board: Board;
+  cursorPosition: Vector2;
+}) {
   return (
     <div style={{ fontSize: 36 }}>
       {board.map((row, index) => (
         <div style={{ lineHeight: 1 }} key={index}>
           {row.map((cell) => cellAA[cell])}
+          {index === cursorPosition.y && "←"}
         </div>
       ))}
+      <div>
+        {board[0].map((_, index) => (index === cursorPosition.x ? "↑" : "　"))}
+      </div>
     </div>
   );
 }
@@ -35,10 +47,33 @@ function App() {
       })
     )
   );
+  const [cursorPosition, setCursorPosition] = useState<Vector2>({ x: 3, y: 3 });
+
+  // カーソルを動かす
+  useEffect(() => {
+    const keyToDiff = (key: string): { dy: number; dx: number } => {
+      if (key === "w") return { dy: -1, dx: 0 };
+      if (key === "s") return { dy: 1, dx: 0 };
+      if (key === "a") return { dy: 0, dx: -1 };
+      if (key === "d") return { dy: 0, dx: 1 };
+      return { dy: 0, dx: 0 };
+    };
+    const handler = (e: KeyboardEvent) => {
+      // WASDでカーソルを上下左右に動かす
+      const diff = keyToDiff(e.key);
+      setCursorPosition((prev) => ({
+        y: (prev.y + diff.dy + BOARD_HEIGHT) % BOARD_HEIGHT,
+        x: (prev.x + diff.dx + BOARD_WIDTH) % BOARD_WIDTH,
+      }));
+    };
+    window.addEventListener("keydown", handler);
+
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
-      <Board board={board} />
+      <Board board={board} cursorPosition={cursorPosition} />
     </div>
   );
 }
